@@ -1,0 +1,11 @@
+# Compiled output
+/target/
+
+# Visual Studio Code settings
+/.vscode/
+
+# IntelliJ IDEA / CLion settings
+/.idea/
+
+# MacOS-specific metadata files
+.DS_Store
