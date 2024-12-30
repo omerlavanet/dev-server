@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-hyper = "0.14"
+hyper = { version = "0.14", features = ["full", "server"] }
 tokio = { version = "1", features = ["full"] }
+log = "0.4"
+simplelog = "0.11"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8"
 structopt = "0.3"
-log = "0.4"
-simplelog = "0.11"

@@ -3,6 +3,9 @@ use serde::Deserialize;
 use std::fs;
 use log::{info, LevelFilter};
 use simplelog::{Config as LogConfig, TermLogger, TerminalMode};
+use hyper::{Body, Request, Response, Server};
+use hyper::service::{make_service_fn, service_fn};
+use hyper::body::to_bytes;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "dev-server", about = "A simple development server.")]
@@ -21,7 +24,8 @@ struct Config {
     listen_address: String,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let opt: Opt  = Opt::from_args();
 
     let mut config: Config = {
@@ -42,5 +46,39 @@ fn main() {
     TermLogger::init(LevelFilter::Info, LogConfig::default(), TerminalMode::Mixed, simplelog::ColorChoice::Auto)
         .expect("Failed to initialize logger");
 
-    info!("Listening on: {}", config.listen_address);
+    let make_svc = make_service_fn(|_conn: &hyper::server::conn::AddrStream| {
+        async {
+            Ok::<_, hyper::Error>(service_fn(|mut req: Request<Body>| {
+                async move {
+                    let whole_body = to_bytes(req.body_mut()).await?;
+                    let body_str = match String::from_utf8(whole_body.to_vec()) {
+                        Ok(body) => body,
+                        Err(e) => {
+                            eprintln!("Request body is not valid UTF-8: {}", e);
+                            return Ok(Response::new(Body::from("Invalid UTF-8 in request body")));
+                        }
+                    };
+                    {
+                        // print the request details
+                        let method = req.method(); // Borrowing reference
+                        let uri = req.uri();       // Borrowing reference
+                        let version = req.version(); // Borrowing reference
+                        let headers = req.headers(); // Borrowing reference
+
+                        info!("--- New Request ---\n\nMethod: {}\nURI: {}\nVersion: {:?}\nHeaders: {:?}\nBody: {}\n", method, uri, version, headers, body_str);
+                    }
+                    Ok::<_, hyper::Error>(Response::new(Body::from("Server Response")))
+                }
+            }))
+        }
+    });
+
+    let addr: std::net::SocketAddr = config.listen_address.parse().expect("Invalid listen address");
+    let server = Server::bind(&addr).serve(make_svc);
+
+    info!("Server running on {}", addr);
+
+    if let Err(e) = server.await {
+        eprintln!("Server error: {}", e);
+    }
 }
